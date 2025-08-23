@@ -4,7 +4,7 @@ extends StaticBody2D
 
 #-DECLARATIONS-#
 
-var _tilemap_node: TileMap
+var tilemaplayer_node: TileMapLayer
 var _collision_polygon_node: CollisionPolygon2D
 
 #-EXPORTS-#
@@ -12,8 +12,8 @@ var _collision_polygon_node: CollisionPolygon2D
 @warning_ignore("unused_private_class_variable")
 @export_placeholder("TileMapActionProperty") var _refresh: String = "" : set = _refresh_action
 
-## NodePath to the tilemap.
-@export_node_path("TileMap") var tilemap_node_path: NodePath : set = set_tilemap_node_path
+## NodePath to the tilemap layer.
+@export_node_path("TileMapLayer") var tilemap_layer_node_path: NodePath : set = set_tilemap_layer_node_path
 
 ## NodePath to CollisionPolygon2D node for which polygon data will be generated. If unset, it will generate it's own.
 ## Note: You should not set this if you want separate floating objects to be included as well.
@@ -22,9 +22,6 @@ var _collision_polygon_node: CollisionPolygon2D
 
 ## Whether we will use the physics material or the tiles themselves.
 @export var reference_physics_material: bool = true
-
-## The layer that will be targetted when referencing your tilemap.
-@export var target_layer: int = 0
 
 ## Tiles that have a physics layer return the original orientation of the physics
 ## layer by default. With this enabled you can respect the orientation within your
@@ -46,6 +43,7 @@ func _refresh_action(value: String) -> void:
 				child.queue_free()
 	
 	set_polygons_on_colliders()
+	apply_tilemap_layer_offset()
 
 func set_polygons_on_colliders() -> void:
 	var polygons = []
@@ -137,8 +135,8 @@ func get_tile_polygon(points) -> Array:
 
 func get_polygons() -> Array:
 	var polygons := []
-	var used_cells = _tilemap_node.get_used_cells(target_layer)
-	var tile_size = _tilemap_node.tile_set.tile_size
+	var used_cells = tilemaplayer_node.get_used_cells()
+	var tile_size = tilemaplayer_node.tile_set.tile_size
 	for cell in used_cells:
 		var polygon = get_tile_polygon(get_points(cell, Vector2(tile_size.x, tile_size.y)))
 		polygons.append(polygon)
@@ -146,18 +144,18 @@ func get_polygons() -> Array:
 
 func get_tiles_with_physics() -> Array:
 	var shapes = []
-	var used_cells = _tilemap_node.get_used_cells(target_layer)
+	var used_cells = tilemaplayer_node.get_used_cells()
 	for cell_pos in used_cells:
-		var tile_data = _tilemap_node.get_cell_tile_data(target_layer, cell_pos)
+		var tile_data = tilemaplayer_node.get_cell_tile_data(cell_pos)
 		# We will use the local and the tilesize to calculate all of the physics points.
 		if tile_data.get_collision_polygons_count(0) != 0:
 			var flip_h := 0
 			var flip_v := 0
 			if force_respect_flipped_tiles_physics:
-				var alt := _tilemap_node.get_cell_alternative_tile(target_layer,cell_pos)
+				var alt := tilemaplayer_node.get_cell_alternative_tile(cell_pos)
 				flip_h = alt & TileSetAtlasSource.TRANSFORM_FLIP_H
 				flip_v = alt & TileSetAtlasSource.TRANSFORM_FLIP_V
-			var local_pos = _tilemap_node.map_to_local(cell_pos)
+			var local_pos = tilemaplayer_node.map_to_local(cell_pos)
 			var physics_coords = tile_data.get_collision_polygon_points(0, 0)
 			var shape: Array[Vector2] = []
 			
@@ -172,23 +170,28 @@ func get_tiles_with_physics() -> Array:
 					shape.append(Vector2(coord.x + local_pos.x, coord.y + local_pos.y))
 			shapes.append(shape)
 	return shapes
+	
+func apply_tilemap_layer_offset() -> void:
+	var offset = tilemaplayer_node.position
+	for child in get_children():
+		child.position += offset
 
-func set_tilemap_node_path(value: NodePath) -> void:
-	tilemap_node_path = value
+func set_tilemap_layer_node_path(value: NodePath) -> void:
+	tilemap_layer_node_path = value
 
 	if not is_inside_tree():
-		print("TileMap must be a within the scene of TileMapCollisionGenerator.")
+		print("TileMapLayer must be a within the scene of TileMapCollisionGenerator.")
 		return
 	
-	if tilemap_node_path.is_empty():
-		_tilemap_node = null
+	if tilemap_layer_node_path.is_empty():
+		tilemaplayer_node = null
 		print("CollidionPolygon2D path is empty.")
 		return
 
-	_tilemap_node = get_node(tilemap_node_path) as TileMap
+	tilemaplayer_node = get_node(tilemap_layer_node_path) as TileMapLayer
 	
-	if not _tilemap_node:
-		push_error("tilemap_node_path should point to proper TileMap node.")
+	if not tilemaplayer_node:
+		push_error("tilemap_layer_node_path should point to proper TileMapLayer node.")
 
 func set_collision_polygon_node_path(value: NodePath) -> void:
 	collision_polygon_node_path = value
@@ -209,7 +212,7 @@ func set_collision_polygon_node_path(value: NodePath) -> void:
 		print("CollisionPolygon2D will be generated for each unique shape.")
 
 func _enter_tree():
-	set_tilemap_node_path(tilemap_node_path)
+	set_tilemap_layer_node_path(tilemap_layer_node_path)
 	set_collision_polygon_node_path(collision_polygon_node_path)
 	pass
 
