@@ -113,7 +113,7 @@ func set_polygons_on_colliders() -> void:
 			polygon_shape.name = "TMCG-CollisionPolygon2D-"+str(count)
 			count += 1
 			add_child(polygon_shape)
-			polygon_shape.owner = get_parent()
+			polygon_shape.owner = get_tree().edited_scene_root
 		print("Added " + str(len(polygons)) + "(s) unique polygons.")
 
 func get_points(position: Vector2, cell_size: Vector2) -> Array:
